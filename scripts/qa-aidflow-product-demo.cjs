@@ -2,9 +2,27 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
+function parseArgs(argv) {
+  const args = {};
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+    if (!token.startsWith('--')) continue;
+    const key = token.slice(2);
+    const next = argv[i + 1];
+    if (!next || next.startsWith('--')) {
+      args[key] = 'true';
+      continue;
+    }
+    args[key] = next;
+    i += 1;
+  }
+  return args;
+}
+
 const root = path.resolve(__dirname, '..');
-const outDir = path.join(root, 'docs', 'product-demo');
-const videoName = 'AidFlow_Product_Demo_actual-ui_narrated.webm';
+const args = parseArgs(process.argv.slice(2));
+const outDir = path.resolve(args.dir || path.join(root, 'docs', 'product-demo'));
+const videoName = args.video || 'AidFlow_Product_Demo_actual-ui_narrated.webm';
 const htmlPath = path.join(outDir, 'check-product-demo.html');
 
 fs.writeFileSync(

@@ -14,19 +14,27 @@ fs.mkdirSync(rawVideoDir, { recursive: true });
 
 const narration = `Hi, this is AidFlow, an AI powered crisis coordination platform for NGOs.
 
-In a disaster, reports do not arrive neatly. A field worker may type a message, speak in Kannada or Hindi, or upload a photo of a field report. AidFlow turns that messy intake into structured, live crisis data.
+This walkthrough shows the working product itself. We start on the live priority board, where needs are ranked by urgency and status. Opening a case reveals the AI reasoning, staffing requirement, and coordinator actions.
 
-The first key feature is multimodal AI intake. In the Submit Need screen, a coordinator can enter a report manually, use voice input in multiple Indian languages, or process an OCR field report. Gemini extracts the location, affected group, urgency, need type, confidence, and the number of volunteers needed. So the field team can report naturally, while the platform creates usable operational data.
+Next, we move into Submit Need, the first key feature: multimodal AI intake. A coordinator can type a report, use voice input, or process an OCR field form. Here we enter a new Ward Five bridge incident, and AidFlow uses Gemini to turn that report into structured crisis data.
 
-The second key feature is AI deduplication. During a crisis, the same incident gets reported again and again in different words. Here, we submit a new Ward Five bridge report. Before it reaches the board, Gemini compares it with open needs in the same organization. AidFlow warns the coordinator that this may be a duplicate, explains why, and offers actions like linking the report or creating it separately. This prevents wasted dispatches and keeps the priority board clean.
+The same intake pipeline supports both voice and OCR paths, so field teams can report naturally while the platform extracts operational details like location, affected group, urgency, need type, and volunteer demand.
 
-The third key feature is adaptive dispatch. The priority board updates live through Firestore, and each need can be opened by a coordinator. The app shows the AI reasoning, staffing requirement, and available actions. When we open volunteer assignment, Gemini ranks free volunteers by skill, zone, experience, and urgency. The AI auto assign flow selects the best team and explains the match.
+When we submit the need, the second key feature appears: AI deduplication. Gemini compares the report with open incidents, flags a likely match, and lets the coordinator link it, cancel it, or create it separately.
 
-AidFlow also learns from coordinators. If a human changes the AI urgency or need type, that correction is logged and reused as future prompt context, so each NGO can calibrate the AI to its own standards over time.
+Back on the priority board, we move into the third key feature, adaptive dispatch. In the volunteer assignment flow, Gemini ranks available volunteers by skill, zone, experience, and urgency, then the AI auto assign action selects the best matching team and explains why.
 
-Under the hood, this prototype uses React and Vite on the frontend, Firebase Hosting, Firebase Authentication, Cloud Firestore for realtime data, and Gemini Flash for classification, OCR, deduplication, and volunteer matching.
+From there, the demo shifts to the volunteer roster, where coordinators can see who is free and who is busy across the NGO workspace, along with skills, zones, and current commitments.
 
-AidFlow is not just a reporting form. It is a working AI native pipeline that helps NGOs move from noisy field reports to faster, safer resource allocation.`;
+AidFlow also includes an adaptive learning loop. When a coordinator overrides urgency or need type, that correction is logged and reused as future prompt context, so the system can better reflect how that NGO actually operates.
+
+We then return to the intake view. This is important because disaster reporting is rarely clean or convenient. Voice and OCR options reduce typing and help distributed teams submit reports faster from the field.
+
+Under the hood, this prototype uses React and Vite on the frontend, Firebase Hosting and Authentication for deployment and access control, Cloud Firestore for realtime updates, and Gemini Flash for classification, OCR, deduplication, and volunteer matching.
+
+What makes AidFlow valuable is that these pieces are not separate demos. They work together as one operational loop, from intake to triage to dispatch to human feedback.
+
+AidFlow helps NGOs move from noisy field reports to faster, safer resource allocation.`;
 
 fs.writeFileSync(path.join(outDir, 'product-demo-script.txt'), narration, 'utf8');
 

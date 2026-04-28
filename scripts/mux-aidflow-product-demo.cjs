@@ -2,17 +2,35 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
+function parseArgs(argv) {
+  const args = {};
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+    if (!token.startsWith('--')) continue;
+    const key = token.slice(2);
+    const next = argv[i + 1];
+    if (!next || next.startsWith('--')) {
+      args[key] = 'true';
+      continue;
+    }
+    args[key] = next;
+    i += 1;
+  }
+  return args;
+}
+
 const root = path.resolve(__dirname, '..');
-const outDir = path.join(root, 'docs', 'product-demo');
-const visual = path.join(outDir, 'AidFlow_Product_Demo_actual-ui.webm');
-const audio = path.join(outDir, 'product-narration.wav');
-const output = path.join(outDir, 'AidFlow_Product_Demo_actual-ui_narrated.webm');
+const args = parseArgs(process.argv.slice(2));
+const outDir = path.resolve(args.dir || path.join(root, 'docs', 'product-demo'));
+const visual = path.join(outDir, args.visual || 'AidFlow_Product_Demo_actual-ui.webm');
+const audio = path.join(outDir, args.audio || 'product-narration.wav');
+const output = path.join(outDir, args.output || 'AidFlow_Product_Demo_actual-ui_narrated.webm');
 
 const html = `<!doctype html>
 <html>
 <body style="margin:0;background:#000">
-<video id="v" src="AidFlow_Product_Demo_actual-ui.webm" muted playsinline></video>
-<audio id="a" src="product-narration.wav"></audio>
+<video id="v" src="${path.basename(visual)}" muted playsinline></video>
+<audio id="a" src="${path.basename(audio)}"></audio>
 <canvas id="c" width="1280" height="720"></canvas>
 <script>
 const v = document.getElementById('v');
@@ -30,6 +48,7 @@ function waitEvent(el, ev) {
 window.__muxAidFlow = async function() {
   if (v.readyState < 1) await waitEvent(v, 'loadedmetadata');
   if (a.readyState < 1) await waitEvent(a, 'loadedmetadata');
+  const tailMs = 1800;
 
   const audioCtx = new AudioContext();
   const source = audioCtx.createMediaElementSource(a);
@@ -58,6 +77,15 @@ window.__muxAidFlow = async function() {
   await a.play();
 
   let lastFrameTime = 0;
+  let audioEndedAt = null;
+  let videoEndedAt = null;
+  let stopScheduled = false;
+  a.addEventListener('ended', () => {
+    audioEndedAt = performance.now();
+  }, { once: true });
+  v.addEventListener('ended', () => {
+    videoEndedAt = performance.now();
+  }, { once: true });
   function frame() {
     ctx.fillStyle = '#070A12';
     ctx.fillRect(0, 0, c.width, c.height);
@@ -65,12 +93,22 @@ window.__muxAidFlow = async function() {
       ctx.drawImage(v, 0, 0, c.width, c.height);
       lastFrameTime = v.currentTime || lastFrameTime;
     }
-    if (!a.ended) requestAnimationFrame(frame);
-    else setTimeout(() => rec.stop(), 500);
+    const now = performance.now();
+    const audioDone = audioEndedAt !== null && now - audioEndedAt >= tailMs;
+    const videoDone = v.ended || videoEndedAt !== null;
+    if (!(audioDone && videoDone)) {
+      requestAnimationFrame(frame);
+      return;
+    }
+    if (!stopScheduled) {
+      stopScheduled = true;
+      rec.requestData();
+      setTimeout(() => rec.stop(), 250);
+    }
   }
   frame();
   await new Promise((resolve) => rec.onstop = resolve);
-  return { chunkCount };
+  return { chunkCount, lastFrameTime, tailMs, audioDuration: a.duration, videoDuration: v.duration };
 };
 </script>
 </body>
