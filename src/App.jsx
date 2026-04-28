@@ -5,6 +5,8 @@ import NeedsBoard from './components/PriorityBoard/NeedsBoard';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import { useAuth } from './context/AuthContext';
+import { useOrg } from './context/OrgContext';
+import OrgPicker from './components/Organization/OrgPicker';
 
 // Code-split: these tabs are behind auth and don't need to load upfront
 const TextSubmitForm = lazy(() => import('./components/NeedSubmission/TextSubmitForm'));
@@ -14,6 +16,7 @@ const VolunteerRoster = lazy(() => import('./components/VolunteerMatch/Volunteer
 function AppContent() {
   const [activeTab, setActiveTab] = useState('board');
   const { user, loading, login, logout, authError } = useAuth();
+  const { currentOrg, loading: orgLoading } = useOrg();
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -55,6 +58,11 @@ function AppContent() {
             </div>
           </div>
         );
+      }
+
+      // Authenticated but no org selected — show org picker
+      if (!orgLoading && !currentOrg) {
+        return <OrgPicker />;
       }
     }
 

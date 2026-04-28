@@ -5,15 +5,18 @@ import App from './App.jsx'
 import { NeedsProvider } from './context/NeedsContext.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { VolunteersProvider } from './context/VolunteersContext.jsx'
+import { OrgProvider } from './context/OrgContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
-      <NeedsProvider>
-        <VolunteersProvider>
-          <App />
-        </VolunteersProvider>
-      </NeedsProvider>
+      <OrgProvider>
+        <NeedsProvider>
+          <VolunteersProvider>
+            <App />
+          </VolunteersProvider>
+        </NeedsProvider>
+      </OrgProvider>
     </AuthProvider>
   </StrictMode>,
 )

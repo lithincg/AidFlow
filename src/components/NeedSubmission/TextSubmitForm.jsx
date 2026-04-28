@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { classifyNeed } from '../../services/gemini';
 import { addNeed } from '../../services/firestore';
+import { useOrg } from '../../context/OrgContext';
 import LoadingSpinner from '../common/LoadingSpinner';
 
 export default function TextSubmitForm() {
@@ -13,6 +14,7 @@ export default function TextSubmitForm() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const { currentOrg } = useOrg();
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -47,7 +49,7 @@ export default function TextSubmitForm() {
         aiReason: classification.reason,
         aiConfidence: classification.confidence,
         aiUnreadParts: null,
-      });
+      }, currentOrg?.id);
 
       setResult({ id: needId, ...classification });
       setForm({ location: '', description: '', affectedGroup: '', reporterName: '' });

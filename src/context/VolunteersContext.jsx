@@ -1,5 +1,6 @@
-import { createContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect, useContext } from 'react';
 import { subscribeToVolunteers } from '../services/firestore';
+import { OrgContext } from './OrgContext';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const VolunteersContext = createContext({ volunteers: [], loading: true, error: null });
@@ -9,8 +10,15 @@ export function VolunteersProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const { currentOrg } = useContext(OrgContext);
+  const orgId = currentOrg?.id || null;
+
   useEffect(() => {
+    setLoading(true);
+    setError(null);
+
     const unsubscribe = subscribeToVolunteers(
+      orgId,
       (updatedVolunteers) => {
         setVolunteers(updatedVolunteers);
         setLoading(false);
@@ -24,7 +32,7 @@ export function VolunteersProvider({ children }) {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [orgId]);
 
   return (
     <VolunteersContext.Provider value={{ volunteers, loading, error }}>

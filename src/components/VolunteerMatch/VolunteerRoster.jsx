@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { addVolunteer } from '../../services/firestore';
 import { useVolunteers } from '../../hooks/useVolunteers';
 import { useNeeds } from '../../hooks/useNeeds';
+import { useOrg } from '../../context/OrgContext';
 import VolunteerCard from './VolunteerCard';
 import LoadingSpinner from '../common/LoadingSpinner';
 
 export default function VolunteerRoster() {
   const { volunteers, freeCount, busyCount, loading, error } = useVolunteers();
   const { needs } = useNeeds();
+  const { currentOrg } = useOrg();
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState('all'); // all | free | busy
   const [submitting, setSubmitting] = useState(false);
@@ -31,7 +33,7 @@ export default function VolunteerRoster() {
         skills: form.skills.split(',').map((s) => s.trim()).filter(Boolean),
         zone: form.zone.trim(),
         phone: form.phone.trim() || null,
-      });
+      }, currentOrg?.id);
       setForm({ name: '', skills: '', zone: '', phone: '' });
       setSubmitMsg('✅ Volunteer registered!');
       setShowForm(false);

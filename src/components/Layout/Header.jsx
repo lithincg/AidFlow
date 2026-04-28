@@ -1,3 +1,5 @@
+import OrgBadge from '../Organization/OrgBadge';
+
 export default function Header({ activeTab, onTabChange, user, login, logout }) {
   const tabs = [
     { id: 'board', label: 'Priority Board' },
@@ -32,6 +34,7 @@ export default function Header({ activeTab, onTabChange, user, login, logout }) 
             </div>
             {user ? (
               <div className="flex items-center gap-3 ml-3 pl-3 border-l border-white/[0.06]">
+                <OrgBadge />
                 <span className="text-xs text-text-secondary hidden sm:block">
                   {user.displayName || user.email}
                 </span>

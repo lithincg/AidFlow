@@ -1,5 +1,6 @@
-import { createContext, useState, useEffect } from 'react';
-import { subscribeToNeeds } from '../services/firestore';
+import { createContext, useState, useEffect, useContext } from 'react';
+import { subscribeToNeeds, subscribeToAllNeeds } from '../services/firestore';
+import { OrgContext } from './OrgContext';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const NeedsContext = createContext({ needs: [], loading: true, error: null });
@@ -9,8 +10,19 @@ export function NeedsProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Read orgId from OrgContext — null means public board (all orgs)
+  const { currentOrg } = useContext(OrgContext);
+  const orgId = currentOrg?.id || null;
+
   useEffect(() => {
-    const unsubscribe = subscribeToNeeds(
+    setLoading(true);
+    setError(null);
+
+    const subscribeFn = orgId
+      ? (cb, errCb) => subscribeToNeeds(orgId, cb, errCb)
+      : (cb, errCb) => subscribeToAllNeeds(cb, errCb);
+
+    const unsubscribe = subscribeFn(
       (updatedNeeds) => {
         setNeeds(updatedNeeds);
         setLoading(false);
@@ -24,7 +36,7 @@ export function NeedsProvider({ children }) {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [orgId]);
 
   return (
     <NeedsContext.Provider value={{ needs, loading, error }}>

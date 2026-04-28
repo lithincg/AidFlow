@@ -21,13 +21,77 @@ import {
 import { db } from './firebase';
 
 // ═══════════════════════════════════════════════════════
-//  NEEDS
+//  ORGANIZATIONS
 // ═══════════════════════════════════════════════════════
 
-export async function addNeed(needData) {
-  // Duplicate check: same location + description on non-resolved needs
+export async function createOrganization(name, userId, userEmail) {
+  const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+  const docRef = await addDoc(collection(db, 'organizations'), {
+    name,
+    slug,
+    createdBy: userId,
+    members: [userId],
+    memberEmails: [userEmail].filter(Boolean),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return { id: docRef.id, name, slug };
+}
+
+export async function getUserOrganizations(userId) {
+  const q = query(
+    collection(db, 'organizations'),
+    where('members', 'array-contains', userId),
+    limit(20)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+    memberCount: (d.data().members || []).length,
+  }));
+}
+
+export async function joinOrganizationByName(name, userId) {
+  // Find org by exact name
+  const q = query(
+    collection(db, 'organizations'),
+    where('name', '==', name),
+    limit(1)
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) {
+    throw new Error(`No organization found with the name "${name}". Check the name and try again.`);
+  }
+
+  const orgDoc = snapshot.docs[0];
+  const orgData = orgDoc.data();
+
+  // Already a member?
+  if ((orgData.members || []).includes(userId)) {
+    return { id: orgDoc.id, ...orgData };
+  }
+
+  await updateDoc(doc(db, 'organizations', orgDoc.id), {
+    members: arrayUnion(userId),
+    updatedAt: serverTimestamp(),
+  });
+
+  return { id: orgDoc.id, ...orgData, memberCount: (orgData.members || []).length + 1 };
+}
+
+// ═══════════════════════════════════════════════════════
+//  NEEDS  (all queries scoped to orgId)
+// ═══════════════════════════════════════════════════════
+
+export async function addNeed(needData, orgId) {
+  if (!orgId) throw new Error('Organization required to submit a need.');
+
+  // Duplicate check: same location + description on non-resolved needs in same org
   const dupQuery = query(
     collection(db, 'needs'),
+    where('orgId', '==', orgId),
     where('location', '==', needData.location),
     where('description', '==', needData.description),
     limit(1)
@@ -40,10 +104,10 @@ export async function addNeed(needData) {
 
   const docRef = await addDoc(collection(db, 'needs'), {
     ...needData,
+    orgId,
     status: 'open',
     assignedVolunteers: [],
     volunteersNeeded: needData.volunteersNeeded || 1,
-    // Deprecated — kept for backward compat reads
     assignedVolunteer: null,
     assignmentReason: null,
     createdAt: serverTimestamp(),
@@ -52,9 +116,34 @@ export async function addNeed(needData) {
   return docRef.id;
 }
 
-export function subscribeToNeeds(callback, onError) {
+// Public board: no orgId filter — shows all NGOs' needs
+export function subscribeToAllNeeds(callback, onError) {
   const q = query(
     collection(db, 'needs'),
+    orderBy('createdAt', 'desc'),
+    limit(100)
+  );
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const needs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      callback(needs);
+    },
+    (error) => {
+      console.error('Firestore onSnapshot error:', error);
+      if (onError) onError(error);
+    }
+  );
+}
+
+// Org-scoped: filtered by orgId
+export function subscribeToNeeds(orgId, callback, onError) {
+  // If no orgId provided, fall back to all needs (public board behaviour)
+  if (!orgId) return subscribeToAllNeeds(callback, onError);
+
+  const q = query(
+    collection(db, 'needs'),
+    where('orgId', '==', orgId),
     orderBy('createdAt', 'desc'),
     limit(100)
   );
@@ -80,19 +169,20 @@ export async function updateNeedStatus(needId, status, extraData = {}) {
   });
 }
 
-export async function getOpenHighPriorityNeeds() {
-  const q = query(
-    collection(db, 'needs'),
+export async function getOpenHighPriorityNeeds(orgId) {
+  const constraints = [
     where('urgency', '==', 'HIGH'),
     where('status', '==', 'open'),
-    limit(50)
-  );
+    limit(50),
+  ];
+  if (orgId) constraints.unshift(where('orgId', '==', orgId));
+
+  const q = query(collection(db, 'needs'), ...constraints);
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 export async function deleteNeed(needId) {
-  // First free any assigned volunteers
   const needRef = doc(db, 'needs', needId);
   const needSnap = await getDoc(needRef);
   if (needSnap.exists()) {
@@ -125,7 +215,6 @@ export async function updateNeedFields(needId, fields) {
 }
 
 export async function deassignNeed(needId) {
-  // Free ALL assigned volunteers and reset need
   return await runTransaction(db, async (transaction) => {
     const needRef = doc(db, 'needs', needId);
     const needSnap = await transaction.get(needRef);
@@ -167,13 +256,16 @@ export async function unresolveNeed(needId) {
 }
 
 // ═══════════════════════════════════════════════════════
-//  VOLUNTEERS
+//  VOLUNTEERS  (all queries scoped to orgId)
 // ═══════════════════════════════════════════════════════
 
-export async function addVolunteer(data) {
-  // Duplicate check: same name + zone
+export async function addVolunteer(data, orgId) {
+  if (!orgId) throw new Error('Organization required to add a volunteer.');
+
+  // Duplicate check: same name + zone within the same org
   const dupQuery = query(
     collection(db, 'volunteers'),
+    where('orgId', '==', orgId),
     where('name', '==', data.name),
     where('zone', '==', (data.zone || '')),
     limit(1)
@@ -188,6 +280,7 @@ export async function addVolunteer(data) {
     skills: data.skills || [],
     zone: data.zone || '',
     phone: data.phone || null,
+    orgId,
     status: 'free',
     assignedNeedIds: [],
     tasksCompleted: 0,
@@ -197,12 +290,11 @@ export async function addVolunteer(data) {
   return docRef.id;
 }
 
-export function subscribeToVolunteers(callback, onError) {
-  const q = query(
-    collection(db, 'volunteers'),
-    orderBy('createdAt', 'desc'),
-    limit(200)
-  );
+export function subscribeToVolunteers(orgId, callback, onError) {
+  const constraints = [orderBy('createdAt', 'desc'), limit(200)];
+  if (orgId) constraints.unshift(where('orgId', '==', orgId));
+
+  const q = query(collection(db, 'volunteers'), ...constraints);
   return onSnapshot(
     q,
     (snapshot) => {
@@ -225,7 +317,6 @@ export async function updateVolunteer(volId, fields) {
 }
 
 export async function deleteVolunteer(volId) {
-  // Remove volunteer from any assigned needs first
   const volRef = doc(db, 'volunteers', volId);
   const volSnap = await getDoc(volRef);
 
@@ -255,12 +346,11 @@ export async function deleteVolunteer(volId) {
   await deleteDoc(volRef);
 }
 
-export async function getFreeVolunteers() {
-  const q = query(
-    collection(db, 'volunteers'),
-    where('status', '==', 'free'),
-    limit(100)
-  );
+export async function getFreeVolunteers(orgId) {
+  const constraints = [where('status', '==', 'free'), limit(100)];
+  if (orgId) constraints.unshift(where('orgId', '==', orgId));
+
+  const q = query(collection(db, 'volunteers'), ...constraints);
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -268,7 +358,6 @@ export async function getFreeVolunteers() {
 // ── Multi-volunteer assignment ─────────────────────────
 
 export async function assignVolunteersToNeed(needId, volunteerEntries) {
-  // volunteerEntries: [{ id, name }, ...]
   return await runTransaction(db, async (transaction) => {
     const needRef = doc(db, 'needs', needId);
     const needSnap = await transaction.get(needRef);
@@ -277,14 +366,12 @@ export async function assignVolunteersToNeed(needId, volunteerEntries) {
     const needData = needSnap.data();
     const currentAssigned = needData.assignedVolunteers || [];
 
-    // Check for duplicates
     const newEntries = volunteerEntries.filter(
       (v) => !currentAssigned.some((a) => a.id === v.id)
     );
 
     if (newEntries.length === 0) throw new Error('Selected volunteers are already assigned');
 
-    // Update each volunteer
     for (const entry of newEntries) {
       const volRef = doc(db, 'volunteers', entry.id);
       const volSnap = await transaction.get(volRef);
@@ -297,13 +384,11 @@ export async function assignVolunteersToNeed(needId, volunteerEntries) {
       });
     }
 
-    // Update the need
     const mergedAssigned = [...currentAssigned, ...newEntries];
     const newStatus = needData.status === 'open' ? 'assigned' : needData.status;
 
     transaction.update(needRef, {
       assignedVolunteers: mergedAssigned,
-      // Also set legacy field for backward compat
       assignedVolunteer: mergedAssigned.map((v) => v.name).join(', '),
       status: newStatus,
       updatedAt: serverTimestamp(),
@@ -320,7 +405,6 @@ export async function deassignVolunteerFromNeed(needId, volunteerId) {
     const needData = needSnap.data();
     const updatedVols = (needData.assignedVolunteers || []).filter((v) => v.id !== volunteerId);
 
-    // Update need
     transaction.update(needRef, {
       assignedVolunteers: updatedVols,
       assignedVolunteer: updatedVols.length > 0 ? updatedVols.map((v) => v.name).join(', ') : null,
@@ -328,7 +412,6 @@ export async function deassignVolunteerFromNeed(needId, volunteerId) {
       updatedAt: serverTimestamp(),
     });
 
-    // Free the volunteer if they have no other assignments
     const volRef = doc(db, 'volunteers', volunteerId);
     const volSnap = await transaction.get(volRef);
     if (volSnap.exists()) {
@@ -352,7 +435,6 @@ export async function resolveNeedAndFreeVolunteers(needId) {
     const data = needSnap.data();
     const assigned = data.assignedVolunteers || [];
 
-    // Free every assigned volunteer and increment their completed count
     for (const entry of assigned) {
       const volRef = doc(db, 'volunteers', entry.id);
       const volSnap = await transaction.get(volRef);
@@ -368,50 +450,9 @@ export async function resolveNeedAndFreeVolunteers(needId) {
       }
     }
 
-    // Resolve the need
     transaction.update(needRef, {
       status: 'resolved',
       updatedAt: serverTimestamp(),
     });
-  });
-}
-
-// Legacy transaction — kept for backward compatibility but no longer used in new flow
-export async function assignVolunteerToNeedTransaction(volunteerData, assignmentData, needId, needUpdateData) {
-  return await runTransaction(db, async (transaction) => {
-    const needRef = doc(db, 'needs', needId);
-    const needDoc = await transaction.get(needRef);
-
-    if (!needDoc.exists()) {
-      throw new Error("This need does not exist anymore.");
-    }
-
-    if (needDoc.data().status !== 'open') {
-      throw new Error("This need has already been assigned or resolved by someone else.");
-    }
-
-    const volRef = doc(collection(db, 'volunteers'));
-    const assignmentRef = doc(collection(db, 'assignments'));
-
-    transaction.set(volRef, {
-      ...volunteerData,
-      assignedNeedId: needId,
-      createdAt: serverTimestamp(),
-    });
-
-    transaction.set(assignmentRef, {
-      ...assignmentData,
-      volunteerId: volRef.id,
-      assignedAt: serverTimestamp(),
-      status: 'active',
-    });
-
-    transaction.update(needRef, {
-      status: 'assigned',
-      ...needUpdateData,
-      updatedAt: serverTimestamp(),
-    });
-
-    return volRef.id;
   });
 }

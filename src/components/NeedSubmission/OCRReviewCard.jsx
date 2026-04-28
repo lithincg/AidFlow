@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { addNeed } from '../../services/firestore';
+import { useOrg } from '../../context/OrgContext';
 import UrgencyBadge from '../PriorityBoard/UrgencyBadge';
 
 export default function OCRReviewCard({ data, imageUrl, onConfirm, onRetry }) {
@@ -12,6 +13,7 @@ export default function OCRReviewCard({ data, imageUrl, onConfirm, onRetry }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const { currentOrg } = useOrg();
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -33,7 +35,7 @@ export default function OCRReviewCard({ data, imageUrl, onConfirm, onRetry }) {
         aiReason: data.reason || 'Classified by OCR',
         aiConfidence: data.confidence || 'medium',
         aiUnreadParts: data.unreadParts || null,
-      });
+      }, currentOrg?.id);
       onConfirm();
     } catch (err) {
       console.error('Save error:', err);
