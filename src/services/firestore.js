@@ -17,6 +17,7 @@ import {
   arrayUnion,
   arrayRemove,
   increment,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { demoOrg, isDemoMode } from '../demo/demoMode';
@@ -217,27 +218,36 @@ export async function getOpenHighPriorityNeeds(orgId) {
 
 export async function deleteNeed(needId) {
   if (isDemoMode()) return;
-  const needRef = doc(db, 'needs', needId);
-  const needSnap = await getDoc(needRef);
-  if (needSnap.exists()) {
+  
+  return await runTransaction(db, async (transaction) => {
+    const needRef = doc(db, 'needs', needId);
+    const needSnap = await transaction.get(needRef);
+    
+    if (!needSnap.exists()) return;
+    
     const data = needSnap.data();
     const assigned = data.assignedVolunteers || [];
+    
     if (assigned.length > 0) {
-      const batch = writeBatch(db);
+      const volSnaps = [];
       for (const entry of assigned) {
         const volRef = doc(db, 'volunteers', entry.id);
-        batch.update(volRef, {
-          assignedNeedIds: arrayRemove(needId),
-          status: 'free',
+        const volSnap = await transaction.get(volRef);
+        if (volSnap.exists()) volSnaps.push({ ref: volRef, data: volSnap.data() });
+      }
+      
+      for (const { ref, data: volData } of volSnaps) {
+        const remainingNeeds = (volData.assignedNeedIds || []).filter((id) => id !== needId);
+        transaction.update(ref, {
+          assignedNeedIds: remainingNeeds,
+          status: remainingNeeds.length > 0 ? 'busy' : 'free',
           updatedAt: serverTimestamp(),
         });
       }
-      batch.delete(needRef);
-      await batch.commit();
-      return;
     }
-  }
-  await deleteDoc(needRef);
+    
+    transaction.delete(needRef);
+  });
 }
 
 export async function updateNeedFields(needId, fields) {
@@ -278,8 +288,8 @@ export async function deassignNeed(needId) {
     transaction.update(needRef, {
       status: 'open',
       assignedVolunteers: [],
-      assignedVolunteer: null,
-      assignmentReason: null,
+      assignedVolunteer: deleteField(),
+      assignmentReason: deleteField(),
       updatedAt: serverTimestamp(),
     });
   });
@@ -460,7 +470,7 @@ export async function deassignVolunteerFromNeed(needId, volunteerId) {
 
     transaction.update(needRef, {
       assignedVolunteers: updatedVols,
-      assignedVolunteer: updatedVols.length > 0 ? updatedVols.map((v) => v.name).join(', ') : null,
+      assignedVolunteer: updatedVols.length > 0 ? updatedVols.map((v) => v.name).join(', ') : deleteField(),
       status: updatedVols.length === 0 ? 'open' : needData.status,
       updatedAt: serverTimestamp(),
     });
