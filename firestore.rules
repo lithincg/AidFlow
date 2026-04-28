@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Needs: publicly readable (the board is open), writable only by authenticated users
+    match /needs/{needId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Volunteers: publicly readable (board shows volunteer counts), writable only by authenticated users
+    match /volunteers/{volId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Assignments: only authenticated users can read/write
+    match /assignments/{assignId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
