@@ -116,30 +116,13 @@ export async function addNeed(needData, orgId) {
   return docRef.id;
 }
 
-// Public board: no orgId filter — shows all NGOs' needs
-export function subscribeToAllNeeds(callback, onError) {
-  const q = query(
-    collection(db, 'needs'),
-    orderBy('createdAt', 'desc'),
-    limit(100)
-  );
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const needs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      callback(needs);
-    },
-    (error) => {
-      console.error('Firestore onSnapshot error:', error);
-      if (onError) onError(error);
-    }
-  );
-}
-
-// Org-scoped: filtered by orgId
+// Org-scoped: filtered by orgId (orgId is required for full isolation)
 export function subscribeToNeeds(orgId, callback, onError) {
-  // If no orgId provided, fall back to all needs (public board behaviour)
-  if (!orgId) return subscribeToAllNeeds(callback, onError);
+  if (!orgId) {
+    // No org = no data — caller should handle this before subscribing
+    callback([]);
+    return () => {};
+  }
 
   const q = query(
     collection(db, 'needs'),

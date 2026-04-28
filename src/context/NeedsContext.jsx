@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, useContext } from 'react';
-import { subscribeToNeeds, subscribeToAllNeeds } from '../services/firestore';
+import { subscribeToNeeds } from '../services/firestore';
 import { OrgContext } from './OrgContext';
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -10,19 +10,24 @@ export function NeedsProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Read orgId from OrgContext — null means public board (all orgs)
+  // Read orgId from OrgContext — null means no org selected
   const { currentOrg } = useContext(OrgContext);
   const orgId = currentOrg?.id || null;
 
   useEffect(() => {
+    // Full isolation: no org = no data
+    if (!orgId) {
+      setNeeds([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    const subscribeFn = orgId
-      ? (cb, errCb) => subscribeToNeeds(orgId, cb, errCb)
-      : (cb, errCb) => subscribeToAllNeeds(cb, errCb);
-
-    const unsubscribe = subscribeFn(
+    const unsubscribe = subscribeToNeeds(
+      orgId,
       (updatedNeeds) => {
         setNeeds(updatedNeeds);
         setLoading(false);

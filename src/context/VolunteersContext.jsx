@@ -14,6 +14,14 @@ export function VolunteersProvider({ children }) {
   const orgId = currentOrg?.id || null;
 
   useEffect(() => {
+    // Full isolation: no org = no data
+    if (!orgId) {
+      setVolunteers([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
