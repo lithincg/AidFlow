@@ -2,7 +2,7 @@
 setlocal
 
 echo =========================================
-echo  Smart Resource Allocation Deployment
+echo  AidFlow Deployment
 echo =========================================
 echo.
 

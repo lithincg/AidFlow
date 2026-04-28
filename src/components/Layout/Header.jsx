@@ -15,14 +15,14 @@ export default function Header({ activeTab, onTabChange, user, login, logout }) 
         <div className="flex items-center justify-between py-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl gradient-accent flex items-center justify-center text-sm font-black text-surface-base">
-              SR
+              AF
             </div>
             <div>
               <h1 className="text-base font-bold text-text-primary tracking-tight">
-                Smart Resource
+                AidFlow
               </h1>
               <p className="text-[10px] font-medium text-text-secondary -mt-0.5 tracking-widest uppercase">
-                AI Allocation
+                AI Coordination
               </p>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { useNeeds } from '../../hooks/useNeeds';
 import { useVolunteers } from '../../hooks/useVolunteers';
+import AIAccuracyBadge from '../PriorityBoard/AIAccuracyBadge';
 
 export default function StatusBar() {
   const { needs, loading } = useNeeds();
@@ -50,6 +51,14 @@ export default function StatusBar() {
               <span className="w-2 h-2 rounded-full bg-urgent-medium"></span>
               <span className="text-text-secondary">{busyCount} Busy</span>
             </div>
+          </>
+        )}
+
+        {/* AI Accuracy — Learning Loop */}
+        {needs.some((n) => n.aiReason) && (
+          <>
+            <div className="w-px h-5 bg-white/[0.06] self-center hidden sm:block" />
+            <AIAccuracyBadge />
           </>
         )}
       </div>

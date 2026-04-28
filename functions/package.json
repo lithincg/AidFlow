@@ -1,6 +1,6 @@
 {
   "name": "functions",
-  "description": "Smart Resource Allocation Cloud Functions",
+  "description": "AidFlow Cloud Functions",
   "engines": {
     "node": "20"
   },

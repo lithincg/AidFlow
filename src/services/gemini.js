@@ -86,7 +86,7 @@ async function callGeminiDirect(body, retries = 1) {
 
 // ── Call 1: Classify a text-based need ────────────────
 
-export async function classifyNeed({ location, description, affectedGroup }) {
+export async function classifyNeed({ location, description, affectedGroup, fewShotBlock = '' }) {
   if (USE_CLOUD_FUNCTIONS) {
     const fn = httpsCallable(functions, 'classifyNeed');
     const result = await fn({ location, description, affectedGroup });
@@ -119,7 +119,7 @@ Rules:
 - HIGH = immediate risk to life, health, or safety; vulnerable people without basics
 - MEDIUM = significant need but not immediately life-threatening
 - LOW = quality of life improvement, non-urgent infrastructure
-- volunteersNeeded: consider the scale of the problem, affected group size, type of work required. A single medical delivery may need 1, a food distribution for 500 people may need 5-10.`;
+- volunteersNeeded: consider the scale of the problem, affected group size, type of work required. A single medical delivery may need 1, a food distribution for 500 people may need 5-10.${fewShotBlock}`;
 
   const result = await callGeminiDirect({
     contents: [{ parts: [{ text: prompt }] }],
@@ -287,4 +287,127 @@ Return JSON:
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.2 },
   });
+}
+
+// ── Call 5: Check for duplicate / related needs ──────
+
+export async function checkDuplicateNeeds({ newNeed, existingNeeds }) {
+  if (!existingNeeds || existingNeeds.length === 0) {
+    return { isDuplicate: false, relatedNeedIds: [], mergeRecommendation: null, confidence: 'high' };
+  }
+
+  // Cap at 20 needs to avoid token overflow: prioritize same-location, then most recent
+  let capped = existingNeeds;
+  if (existingNeeds.length > 20) {
+    const newLoc = (newNeed.location || '').toLowerCase();
+    const sameLocation = existingNeeds.filter(
+      (n) => (n.location || '').toLowerCase().includes(newLoc) || newLoc.includes((n.location || '').toLowerCase())
+    );
+    const rest = existingNeeds
+      .filter((n) => !sameLocation.includes(n))
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    capped = [...sameLocation, ...rest].slice(0, 20);
+  }
+
+  const needsList = capped
+    .map(
+      (n) =>
+        `${n.id} | ${n.location} | ${n.needType} | ${n.description} | Status: ${n.status}`
+    )
+    .join('\n');
+
+  const prompt = `You are a crisis report analyst specializing in deduplication for an NGO platform.
+During disasters, the same incident is often reported multiple times by different people.
+Your job is to determine if a NEW report describes the same crisis as any EXISTING reports.
+Always return ONLY valid JSON. No preamble, no markdown.
+
+NEW REPORT being submitted:
+Location: ${newNeed.location}
+Description: ${newNeed.description}
+Affected Group: ${newNeed.affectedGroup || 'Not specified'}
+Type: ${newNeed.needType || 'Unknown'}
+
+EXISTING OPEN REPORTS in this organization:
+${needsList}
+
+(Each existing report is formatted as: ID | Location | Type | Description | Status)
+
+Analyze the NEW report against ALL existing reports and determine:
+1. Is this new report describing the SAME incident as any existing report?
+2. Is it RELATED but not identical (e.g., different aspect of the same crisis)?
+3. Is it completely unique?
+
+Return this exact JSON:
+{
+  "isDuplicate": true | false,
+  "relatedNeedIds": ["id1", "id2"],
+  "relationship": "duplicate" | "related" | "unique",
+  "mergeRecommendation": "1-2 sentences explaining why these are related and what to do. null if unique.",
+  "combinedVolunteersNeeded": <integer or null — if merging, how many total volunteers needed>,
+  "confidence": "high" | "medium" | "low"
+}
+
+Rules:
+- "duplicate" = clearly the same incident described differently (same location + same problem)
+- "related" = connected but distinct (e.g., bridge collapse + road blocked near same bridge)
+- "unique" = no meaningful connection to existing reports
+- Only flag as duplicate/related if you're reasonably confident. Don't over-flag.
+- Return relatedNeedIds as an empty array if unique.`;
+
+  return callGeminiDirect({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.1 },
+  });
+}
+
+// ── Call 6: Classify a voice-transcribed report ──────
+
+export async function classifyVoiceReport({ transcript, fewShotBlock = '' }) {
+  if (!transcript || transcript.trim().length === 0) {
+    throw new Error('Empty transcript');
+  }
+
+  const prompt = `You are a crisis report analyst for an NGO coordination platform in India.
+A field worker has just spoken a crisis report into their phone. The speech has been transcribed.
+The transcription may be:
+- In English, Hindi, Kannada, Telugu, Marathi, or a MIX of languages
+- Informal, fragmented, or emotional
+- Contain filler words, repetitions, or corrections
+
+Your job is to extract structured information and classify the urgency.
+Always return ONLY valid JSON. No preamble, no markdown.
+
+SPOKEN TRANSCRIPT:
+"${transcript}"
+
+Extract all information and return this exact JSON structure:
+{
+  "language": "English" | "Hindi" | "Kannada" | "Telugu" | "Marathi" | "Mixed",
+  "location": "extracted location or 'Not specified'",
+  "description": "cleaned up, coherent crisis description in English",
+  "affectedGroup": "who is affected, extracted or inferred",
+  "reporterName": "if the speaker mentions their name, otherwise null",
+  "urgency": "HIGH" | "MEDIUM" | "LOW",
+  "needType": "Medical" | "Food" | "Safety" | "Infrastructure" | "Other",
+  "reason": "One sentence explaining the urgency classification",
+  "confidence": "high" | "medium" | "low",
+  "volunteersNeeded": <integer, minimum 1>,
+  "originalTranscript": "the raw transcript exactly as provided"
+}
+
+Rules:
+- HIGH = immediate risk to life, health, or safety; vulnerable people without basics
+- MEDIUM = significant need but not immediately life-threatening
+- LOW = quality of life improvement, non-urgent
+- Translate any non-English content into English for the description field
+- Keep the originalTranscript exactly as spoken
+- If the transcript is too vague to classify, set confidence to "low"${fewShotBlock}`;
+
+  const result = await callGeminiDirect({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.1 },
+  });
+  const normalized = normalizeClassification(result);
+  normalized.volunteersNeeded = Math.max(1, parseInt(normalized.volunteersNeeded) || 1);
+  return normalized;
 }

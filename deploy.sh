@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Smart Resource Allocation - Deployment Script
+# AidFlow - Deployment Script
 # Automatically builds the frontend and deploys to Firebase
 
 echo "🚀 Starting deployment process..."

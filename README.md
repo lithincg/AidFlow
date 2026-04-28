@@ -1,4 +1,4 @@
-# Smart Resource Allocation — AI-Powered NGO Coordination
+# AidFlow — AI-Powered NGO Coordination
 
 > **The Problem:** NGO field workers report crises on paper. Coordinators manually triage them. Volunteers get mis-matched. People wait longer than they should.  
 > **Our Solution:** A real-time web platform where Google Gemini AI reads the report, classifies the urgency, and dispatches the right volunteer — in seconds.

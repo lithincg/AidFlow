@@ -1,4 +1,4 @@
-# SMART RESOURCE ALLOCATION — FULL BUILD PLAN
+# AIDFLOW — FULL BUILD PLAN
 ### Data-Driven Volunteer Coordination for Social Impact
 **Competition: SC 2026 Built with AI (AntiGravity)**
 **Stack: Google AI Studio (Gemini API) + Firebase + React**
@@ -7,7 +7,7 @@
 
 ## 📌 INSTRUCTIONS FOR AI READING THIS DOCUMENT
 
-This document is a complete specification for building a working prototype of the Smart Resource Allocation app. It is written to be read and implemented by an AI coding assistant (Google AI Studio / Gemini via AntiGravity).
+This document is a complete specification for building a working prototype of the AidFlow app. It is written to be read and implemented by an AI coding assistant (Google AI Studio / Gemini via AntiGravity).
 
 **If you are Claude Opus reviewing this plan:**
 - Identify any architectural gaps, logical flaws, or missing edge cases
@@ -685,4 +685,4 @@ Based on typical SC 2026 / hackathon criteria:
 ---
 
 *Document Version: 1.0 | Built for SC 2026 Built with AI (AntiGravity)*
-*Problem Track: Smart Resource Allocation — Data-Driven Volunteer Coordination*
+*Problem Track: AidFlow — Data-Driven Volunteer Coordination*

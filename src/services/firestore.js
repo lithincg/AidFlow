@@ -24,12 +24,13 @@ import { db } from './firebase';
 //  ORGANIZATIONS
 // ═══════════════════════════════════════════════════════
 
-export async function createOrganization(name, userId, userEmail) {
+export async function createOrganization(name, userId, userEmail, pin) {
   const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
   const docRef = await addDoc(collection(db, 'organizations'), {
     name,
     slug,
+    pin: pin || '0000',
     createdBy: userId,
     members: [userId],
     memberEmails: [userEmail].filter(Boolean),
@@ -81,6 +82,25 @@ export async function joinOrganizationByName(name, userId) {
   return { id: orgDoc.id, ...orgData, memberCount: (orgData.members || []).length + 1 };
 }
 
+export async function getAllOrganizations() {
+  const q = query(collection(db, 'organizations'), limit(50));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+    memberCount: (d.data().members || []).length,
+  }));
+}
+
+export async function joinOrganizationById(orgId, userId) {
+  const orgRef = doc(db, 'organizations', orgId);
+  await updateDoc(orgRef, {
+    members: arrayUnion(userId),
+    updatedAt: serverTimestamp(),
+  });
+  return { id: orgId };
+}
+
 // ═══════════════════════════════════════════════════════
 //  NEEDS  (all queries scoped to orgId)
 // ═══════════════════════════════════════════════════════
@@ -110,10 +130,29 @@ export async function addNeed(needData, orgId) {
     volunteersNeeded: needData.volunteersNeeded || 1,
     assignedVolunteer: null,
     assignmentReason: null,
+    linkedNeedIds: needData.linkedNeedIds || [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
   return docRef.id;
+}
+
+// ── Link related needs (deduplication) ─────────────────
+
+export async function linkNeeds(needIds) {
+  if (!needIds || needIds.length < 2) return;
+
+  const batch = writeBatch(db);
+  for (const id of needIds) {
+    const ref = doc(db, 'needs', id);
+    // Each need gets the OTHER ids as linked
+    const otherIds = needIds.filter((nid) => nid !== id);
+    batch.update(ref, {
+      linkedNeedIds: arrayUnion(...otherIds),
+      updatedAt: serverTimestamp(),
+    });
+  }
+  await batch.commit();
 }
 
 // Org-scoped: filtered by orgId (orgId is required for full isolation)

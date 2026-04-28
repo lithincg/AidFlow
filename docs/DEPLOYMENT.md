@@ -1,6 +1,6 @@
-# 🚀 Deployment Guide: Smart Resource Allocation
+# 🚀 Deployment Guide: AidFlow
 
-This guide covers how to run and deploy the Smart Resource Allocation platform completely for free. 
+This guide covers how to run and deploy the AidFlow platform completely for free. 
 
 The architecture consists of a React frontend (Vite) and a serverless backend hosted on Firebase (Firestore, Auth, and Cloud Functions). Because we utilize the Firebase Spark plan and Google AI Studio's free tier, your total hosting cost will be **$0**.
 
@@ -33,7 +33,7 @@ While the frontend can be hosted anywhere, the backend **must** be deployed to F
 
 ### 1. Create a Firebase Project
 1. Go to the [Firebase Console](https://console.firebase.google.com/).
-2. Click **Add project** and name it "Smart Resource Allocation".
+2. Click **Add project** and name it "AidFlow".
 3. Disable Google Analytics (optional, for simplicity).
 4. Go to **Build > Authentication** and enable the **Google** sign-in provider.
 5. Go to **Build > Firestore Database** and click **Create database**. Start in **Test mode** (we will deploy our secure rules later). Choose a location close to your users (e.g., `asia-south1` for India).

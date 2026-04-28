@@ -11,6 +11,7 @@ import OrgPicker from './components/Organization/OrgPicker';
 // Code-split: these tabs are behind auth and don't need to load upfront
 const TextSubmitForm = lazy(() => import('./components/NeedSubmission/TextSubmitForm'));
 const OCRUpload = lazy(() => import('./components/NeedSubmission/OCRUpload'));
+const VoiceSubmitForm = lazy(() => import('./components/NeedSubmission/VoiceSubmitForm'));
 const VolunteerRoster = lazy(() => import('./components/VolunteerMatch/VolunteerRoster'));
 
 // ── Welcome Landing (shown when not logged in) ─────────
@@ -20,11 +21,11 @@ function WelcomeLanding({ login, authError }) {
       <div className="bg-surface-card border border-white/[0.04] p-8 rounded-2xl max-w-lg w-full text-center">
         {/* Logo */}
         <div className="w-16 h-16 rounded-2xl gradient-accent flex items-center justify-center mx-auto mb-6">
-          <span className="text-surface-base font-black text-2xl">SR</span>
+          <span className="text-surface-base font-black text-2xl">AF</span>
         </div>
 
         <h2 className="text-xl font-bold text-text-primary mb-2">
-          Smart Resource Allocation
+          AidFlow
         </h2>
         <p className="text-text-secondary text-sm mb-2">
           AI-powered disaster relief coordination for NGOs
@@ -113,6 +114,15 @@ function AppContent() {
           <Suspense fallback={<LoadingSpinner text="Loading submission form..." />}>
             <div className="space-y-6 max-w-3xl mx-auto">
               <TextSubmitForm />
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-white/[0.06]" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-surface-base px-4 text-[10px] text-text-muted uppercase tracking-widest font-medium">or use voice / photo</span>
+                </div>
+              </div>
+              <VoiceSubmitForm />
               <OCRUpload />
             </div>
           </Suspense>

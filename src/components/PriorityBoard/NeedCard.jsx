@@ -1,4 +1,5 @@
 import UrgencyBadge from './UrgencyBadge';
+import CrisisCluster from './CrisisCluster';
 import { useAuth } from '../../context/AuthContext';
 
 function timeAgo(timestamp) {
@@ -126,6 +127,8 @@ export default function NeedCard({ need, onClick }) {
           🧠 {need.aiReason}
         </p>
       </div>
+
+      <CrisisCluster linkedNeedIds={need.linkedNeedIds} />
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/[0.04]">

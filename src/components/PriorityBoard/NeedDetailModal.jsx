@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import UrgencyBadge from './UrgencyBadge';
 import AssignVolunteersPanel from './AssignVolunteersPanel';
 import { useAuth } from '../../context/AuthContext';
+import { useOrg } from '../../context/OrgContext';
 import {
   updateNeedStatus,
   updateNeedFields,
@@ -10,6 +11,7 @@ import {
   unresolveNeed,
   resolveNeedAndFreeVolunteers,
 } from '../../services/firestore';
+import { logCorrection } from '../../services/corrections';
 
 function timeAgo(timestamp) {
   if (!timestamp?.seconds) return 'just now';
@@ -23,10 +25,12 @@ function timeAgo(timestamp) {
 }
 
 const URGENCY_OPTIONS = ['HIGH', 'MEDIUM', 'LOW'];
+const NEED_TYPE_OPTIONS = ['Medical', 'Food', 'Safety', 'Infrastructure', 'Other'];
 
 export default function NeedDetailModal({ need, onClose }) {
   const overlayRef = useRef(null);
   const { user, login } = useAuth();
+  const { currentOrg } = useOrg();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -40,6 +44,7 @@ export default function NeedDetailModal({ need, onClose }) {
     affectedGroup: '',
     reporterName: '',
     urgency: '',
+    needType: '',
   });
 
   // Confirm dialog
@@ -60,6 +65,7 @@ export default function NeedDetailModal({ need, onClose }) {
         affectedGroup: need.affectedGroup || '',
         reporterName: need.reporterName || '',
         urgency: need.urgency || 'MEDIUM',
+        needType: need.needType || 'Other',
       });
       setEditing(false);
       setShowAssignPanel(false);
@@ -122,11 +128,36 @@ export default function NeedDetailModal({ need, onClose }) {
       if (editForm.affectedGroup !== need.affectedGroup) updates.affectedGroup = editForm.affectedGroup;
       if (editForm.reporterName !== (need.reporterName || '')) updates.reporterName = editForm.reporterName || null;
       if (editForm.urgency !== need.urgency) updates.urgency = editForm.urgency;
+      if (editForm.needType !== need.needType) updates.needType = editForm.needType;
 
       if (Object.keys(updates).length === 0) {
         setEditing(false);
         return;
       }
+
+      // ── AI Learning Loop: log corrections when AI fields are overridden ──
+      if (updates.urgency && need.aiReason) {
+        await logCorrection(need.id, currentOrg?.id, {
+          field: 'urgency',
+          aiValue: need.urgency,
+          humanValue: updates.urgency,
+          description: need.description,
+          needType: need.needType,
+          location: need.location,
+        }, user?.uid);
+      }
+
+      if (editForm.needType && editForm.needType !== need.needType && need.aiReason) {
+        await logCorrection(need.id, currentOrg?.id, {
+          field: 'needType',
+          aiValue: need.needType,
+          humanValue: editForm.needType,
+          description: need.description,
+          needType: need.needType,
+          location: need.location,
+        }, user?.uid);
+      }
+
       await updateNeedFields(need.id, updates);
       setEditing(false);
     });
@@ -256,6 +287,25 @@ export default function NeedDetailModal({ need, onClose }) {
                         ))}
                       </div>
                     </div>
+                    <div>
+                      <label className="detail-label">Need Type</label>
+                      <div className="flex flex-wrap gap-2 mt-1.5">
+                        {NEED_TYPE_OPTIONS.map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setEditForm((p) => ({ ...p, needType: t }))}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                              editForm.needType === t
+                                ? 'bg-secondary/20 text-secondary border border-secondary/30'
+                                : 'bg-white/[0.04] text-text-secondary border border-white/[0.06] hover:bg-white/[0.08]'
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="flex gap-2 pt-2">
                       <button className="btn-primary flex-1 py-2.5" onClick={handleSaveEdit} disabled={busy}>
                         {busy ? 'Saving...' : '💾 Save Changes'}
@@ -270,6 +320,7 @@ export default function NeedDetailModal({ need, onClose }) {
                             affectedGroup: need.affectedGroup || '',
                             reporterName: need.reporterName || '',
                             urgency: need.urgency || 'MEDIUM',
+                            needType: need.needType || 'Other',
                           });
                         }}
                       >
