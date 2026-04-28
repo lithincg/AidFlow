@@ -19,12 +19,14 @@ import {
   increment,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { demoOrg, isDemoMode } from '../demo/demoMode';
 
 // ═══════════════════════════════════════════════════════
 //  ORGANIZATIONS
 // ═══════════════════════════════════════════════════════
 
 export async function createOrganization(name, userId, userEmail, pin) {
+  if (isDemoMode()) return { id: demoOrg.id, name: demoOrg.name, slug: demoOrg.slug };
   const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
   const docRef = await addDoc(collection(db, 'organizations'), {
@@ -41,6 +43,7 @@ export async function createOrganization(name, userId, userEmail, pin) {
 }
 
 export async function getUserOrganizations(userId) {
+  if (isDemoMode()) return [demoOrg];
   const q = query(
     collection(db, 'organizations'),
     where('members', 'array-contains', userId),
@@ -83,6 +86,7 @@ export async function joinOrganizationByName(name, userId) {
 }
 
 export async function getAllOrganizations() {
+  if (isDemoMode()) return [demoOrg];
   const q = query(collection(db, 'organizations'), limit(50));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({
@@ -93,6 +97,7 @@ export async function getAllOrganizations() {
 }
 
 export async function joinOrganizationById(orgId, userId) {
+  if (isDemoMode()) return { id: demoOrg.id };
   const orgRef = doc(db, 'organizations', orgId);
   await updateDoc(orgRef, {
     members: arrayUnion(userId),
@@ -106,6 +111,10 @@ export async function joinOrganizationById(orgId, userId) {
 // ═══════════════════════════════════════════════════════
 
 export async function addNeed(needData, orgId) {
+  if (isDemoMode()) {
+    await new Promise((r) => setTimeout(r, 350));
+    return `demo-need-${Date.now()}`;
+  }
   if (!orgId) throw new Error('Organization required to submit a need.');
 
   // Duplicate check: same location + description on non-resolved needs in same org
@@ -140,6 +149,7 @@ export async function addNeed(needData, orgId) {
 // ── Link related needs (deduplication) ─────────────────
 
 export async function linkNeeds(needIds) {
+  if (isDemoMode()) return;
   if (!needIds || needIds.length < 2) return;
 
   const batch = writeBatch(db);
@@ -183,6 +193,7 @@ export function subscribeToNeeds(orgId, callback, onError) {
 }
 
 export async function updateNeedStatus(needId, status, extraData = {}) {
+  if (isDemoMode()) return;
   const needRef = doc(db, 'needs', needId);
   await updateDoc(needRef, {
     status,
@@ -205,6 +216,7 @@ export async function getOpenHighPriorityNeeds(orgId) {
 }
 
 export async function deleteNeed(needId) {
+  if (isDemoMode()) return;
   const needRef = doc(db, 'needs', needId);
   const needSnap = await getDoc(needRef);
   if (needSnap.exists()) {
@@ -229,6 +241,7 @@ export async function deleteNeed(needId) {
 }
 
 export async function updateNeedFields(needId, fields) {
+  if (isDemoMode()) return;
   const needRef = doc(db, 'needs', needId);
   await updateDoc(needRef, {
     ...fields,
@@ -237,6 +250,7 @@ export async function updateNeedFields(needId, fields) {
 }
 
 export async function deassignNeed(needId) {
+  if (isDemoMode()) return;
   return await runTransaction(db, async (transaction) => {
     const needRef = doc(db, 'needs', needId);
     const needSnap = await transaction.get(needRef);
@@ -245,18 +259,20 @@ export async function deassignNeed(needId) {
     const data = needSnap.data();
     const assigned = data.assignedVolunteers || [];
 
+    const volSnaps = [];
     for (const entry of assigned) {
       const volRef = doc(db, 'volunteers', entry.id);
       const volSnap = await transaction.get(volRef);
-      if (volSnap.exists()) {
-        const volData = volSnap.data();
-        const remainingNeeds = (volData.assignedNeedIds || []).filter((id) => id !== needId);
-        transaction.update(volRef, {
-          assignedNeedIds: remainingNeeds,
-          status: remainingNeeds.length > 0 ? 'busy' : 'free',
-          updatedAt: serverTimestamp(),
-        });
-      }
+      if (volSnap.exists()) volSnaps.push({ ref: volRef, data: volSnap.data() });
+    }
+
+    for (const { ref, data: volData } of volSnaps) {
+      const remainingNeeds = (volData.assignedNeedIds || []).filter((id) => id !== needId);
+      transaction.update(ref, {
+        assignedNeedIds: remainingNeeds,
+        status: remainingNeeds.length > 0 ? 'busy' : 'free',
+        updatedAt: serverTimestamp(),
+      });
     }
 
     transaction.update(needRef, {
@@ -270,6 +286,7 @@ export async function deassignNeed(needId) {
 }
 
 export async function unresolveNeed(needId) {
+  if (isDemoMode()) return;
   const needRef = doc(db, 'needs', needId);
   await updateDoc(needRef, {
     status: 'open',
@@ -282,6 +299,7 @@ export async function unresolveNeed(needId) {
 // ═══════════════════════════════════════════════════════
 
 export async function addVolunteer(data, orgId) {
+  if (isDemoMode()) return `demo-vol-${Date.now()}`;
   if (!orgId) throw new Error('Organization required to add a volunteer.');
 
   // Duplicate check: same name + zone within the same org
@@ -331,6 +349,7 @@ export function subscribeToVolunteers(orgId, callback, onError) {
 }
 
 export async function updateVolunteer(volId, fields) {
+  if (isDemoMode()) return;
   const volRef = doc(db, 'volunteers', volId);
   await updateDoc(volRef, {
     ...fields,
@@ -339,6 +358,7 @@ export async function updateVolunteer(volId, fields) {
 }
 
 export async function deleteVolunteer(volId) {
+  if (isDemoMode()) return;
   const volRef = doc(db, 'volunteers', volId);
   const volSnap = await getDoc(volRef);
 
@@ -380,6 +400,10 @@ export async function getFreeVolunteers(orgId) {
 // ── Multi-volunteer assignment ─────────────────────────
 
 export async function assignVolunteersToNeed(needId, volunteerEntries) {
+  if (isDemoMode()) {
+    await new Promise((r) => setTimeout(r, 400));
+    return;
+  }
   return await runTransaction(db, async (transaction) => {
     const needRef = doc(db, 'needs', needId);
     const needSnap = await transaction.get(needRef);
@@ -394,11 +418,14 @@ export async function assignVolunteersToNeed(needId, volunteerEntries) {
 
     if (newEntries.length === 0) throw new Error('Selected volunteers are already assigned');
 
+    const volRefs = [];
     for (const entry of newEntries) {
       const volRef = doc(db, 'volunteers', entry.id);
       const volSnap = await transaction.get(volRef);
-      if (!volSnap.exists()) continue;
+      if (volSnap.exists()) volRefs.push(volRef);
+    }
 
+    for (const volRef of volRefs) {
       transaction.update(volRef, {
         status: 'busy',
         assignedNeedIds: arrayUnion(needId),
@@ -419,10 +446,14 @@ export async function assignVolunteersToNeed(needId, volunteerEntries) {
 }
 
 export async function deassignVolunteerFromNeed(needId, volunteerId) {
+  if (isDemoMode()) return;
   return await runTransaction(db, async (transaction) => {
     const needRef = doc(db, 'needs', needId);
     const needSnap = await transaction.get(needRef);
     if (!needSnap.exists()) throw new Error('Need not found');
+
+    const volRef = doc(db, 'volunteers', volunteerId);
+    const volSnap = await transaction.get(volRef);
 
     const needData = needSnap.data();
     const updatedVols = (needData.assignedVolunteers || []).filter((v) => v.id !== volunteerId);
@@ -434,8 +465,6 @@ export async function deassignVolunteerFromNeed(needId, volunteerId) {
       updatedAt: serverTimestamp(),
     });
 
-    const volRef = doc(db, 'volunteers', volunteerId);
-    const volSnap = await transaction.get(volRef);
     if (volSnap.exists()) {
       const volData = volSnap.data();
       const remaining = (volData.assignedNeedIds || []).filter((id) => id !== needId);
@@ -449,6 +478,7 @@ export async function deassignVolunteerFromNeed(needId, volunteerId) {
 }
 
 export async function resolveNeedAndFreeVolunteers(needId) {
+  if (isDemoMode()) return;
   return await runTransaction(db, async (transaction) => {
     const needRef = doc(db, 'needs', needId);
     const needSnap = await transaction.get(needRef);
@@ -457,19 +487,23 @@ export async function resolveNeedAndFreeVolunteers(needId) {
     const data = needSnap.data();
     const assigned = data.assignedVolunteers || [];
 
+    const volSnaps = [];
     for (const entry of assigned) {
       const volRef = doc(db, 'volunteers', entry.id);
-      const volSnap = await transaction.get(volRef);
-      if (volSnap.exists()) {
-        const volData = volSnap.data();
-        const remaining = (volData.assignedNeedIds || []).filter((id) => id !== needId);
-        transaction.update(volRef, {
-          assignedNeedIds: remaining,
-          status: remaining.length > 0 ? 'busy' : 'free',
-          tasksCompleted: increment(1),
-          updatedAt: serverTimestamp(),
-        });
+      const snap = await transaction.get(volRef);
+      if (snap.exists()) {
+        volSnaps.push({ ref: volRef, data: snap.data() });
       }
+    }
+
+    for (const { ref, data: volData } of volSnaps) {
+      const remaining = (volData.assignedNeedIds || []).filter((id) => id !== needId);
+      transaction.update(ref, {
+        assignedNeedIds: remaining,
+        status: remaining.length > 0 ? 'busy' : 'free',
+        tasksCompleted: increment(1),
+        updatedAt: serverTimestamp(),
+      });
     }
 
     transaction.update(needRef, {

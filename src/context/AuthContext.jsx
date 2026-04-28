@@ -7,25 +7,29 @@ import {
   signOut 
 } from 'firebase/auth';
 import { app } from '../services/firebase';
+import { demoUser, isDemoMode } from '../demo/demoMode';
 
 const auth = getAuth(app);
 // eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext({ user: null, loading: true, login: () => {}, logout: () => {} });
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const demo = isDemoMode();
+  const [user, setUser] = useState(demo ? demoUser : null);
+  const [loading, setLoading] = useState(!demo);
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
+    if (demo) return undefined;
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
     });
     return unsubscribe;
-  }, []);
+  }, [demo]);
 
   const login = async () => {
+    if (demo) return;
     const provider = new GoogleAuthProvider();
     setAuthError(null);
     try {
@@ -43,6 +47,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    if (demo) return;
     try {
       await signOut(auth);
     } catch (error) {

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { getUserOrganizations } from '../services/firestore';
+import { demoOrg, isDemoMode } from '../demo/demoMode';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const OrgContext = createContext({
@@ -14,13 +15,15 @@ export const OrgContext = createContext({
 const LS_KEY = 'sra_current_org';
 
 export function OrgProvider({ children }) {
+  const demo = isDemoMode();
   const { user } = useAuth();
-  const [currentOrg, setCurrentOrg] = useState(null);
-  const [userOrgs, setUserOrgs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [currentOrg, setCurrentOrg] = useState(demo ? demoOrg : null);
+  const [userOrgs, setUserOrgs] = useState(demo ? [demoOrg] : []);
+  const [loading, setLoading] = useState(!demo);
 
   // Load user's organizations when auth state changes
   useEffect(() => {
+    if (demo) return undefined;
     if (!user) {
       setCurrentOrg(null);
       setUserOrgs([]);
@@ -63,7 +66,7 @@ export function OrgProvider({ children }) {
 
     loadOrgs();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, demo]);
 
   const selectOrg = useCallback((org) => {
     setCurrentOrg(org);
@@ -81,6 +84,7 @@ export function OrgProvider({ children }) {
 
   // Refresh userOrgs (called after creating/joining an org)
   const refreshOrgs = useCallback(async () => {
+    if (demo) return [demoOrg];
     if (!user) return;
     try {
       const orgs = await getUserOrganizations(user.uid);
@@ -90,7 +94,7 @@ export function OrgProvider({ children }) {
       console.error('Failed to refresh organizations:', err);
       return [];
     }
-  }, [user]);
+  }, [user, demo]);
 
   return (
     <OrgContext.Provider value={{ currentOrg, userOrgs, loading, selectOrg, clearOrg, refreshOrgs }}>

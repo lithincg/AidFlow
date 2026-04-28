@@ -1,0 +1,15 @@
+AidFlow is an AI powered crisis coordination platform for NGOs.
+
+In disasters, the problem is not only that help is limited. The problem is that reports arrive fast, in different languages, from different volunteers, and often describe the same incident in different words. Coordinators lose time reading, translating, sorting, and avoiding duplicate dispatches.
+
+AidFlow turns that chaotic intake into one live operating board.
+
+Feature one is multimodal AI intake. A field worker can submit a need as text, by speaking into the browser, or by uploading a photo of a field report. The voice flow supports English, Hindi, Kannada, Telugu, and Marathi. Gemini extracts the location, affected group, clean English description, urgency, need type, confidence, and the number of volunteers needed. This means a field worker can report what is happening naturally, while the system turns it into structured crisis data.
+
+Feature two is AI crisis deduplication with a real time priority board. Before a new report is saved, Gemini compares it with open reports from the same organization. If it looks like a duplicate or a related incident, AidFlow warns the coordinator and gives clear actions: cancel, create separately, or link the reports. When a report is accepted, Cloud Firestore updates the board live, showing high priority counts, status filters, need cards, and AI reasoning.
+
+Feature three is the adaptive learning and dispatch loop. Coordinators remain in control. If they change the AI urgency or need type, AidFlow logs that correction in Firestore. The most recent corrections become few shot examples in future Gemini prompts, so the model calibrates to that NGO's standards over time. Then, for dispatch, Gemini ranks available volunteers by skills, zone, experience, and the urgency of the need. Firestore transactions keep assignments consistent while needs move from open, to assigned, to in progress, to resolved.
+
+The stack is built for the Google Solution Challenge: React and Vite on the frontend, Firebase Hosting for deployment, Firebase Authentication for access, Cloud Firestore for real time data, and Gemini Flash for classification, OCR, deduplication, and volunteer matching.
+
+AidFlow is not just a form. It is an adaptive AI native crisis pipeline that helps NGOs move from noisy reports to faster, safer resource allocation.

@@ -1,0 +1,172 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>AidFlow Demo Recorder</title>
+  <style>
+    html, body { margin: 0; background: #05070d; overflow: hidden; }
+    canvas { width: 1280px; height: 720px; display: block; }
+  </style>
+</head>
+<body>
+<canvas id="c" width="1280" height="720"></canvas>
+<audio id="voice" src="narration.wav" preload="auto"></audio>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const audio = document.getElementById('voice');
+const landing = new Image();
+landing.src = '../ppt-assets/deployed-landing.png';
+const W = 1280, H = 720;
+const C = {
+  bg: '#070A12', panel: '#101522', panel2: '#151C2B', ink: '#EAF2FF',
+  muted: '#9AA7B8', blue: '#4285F4', red: '#EA4335', yellow: '#FBBC04',
+  green: '#34A853', cyan: '#4FD1C5', white: '#FFFFFF'
+};
+
+function rr(x,y,w,h,r,fill,stroke='#273249',lw=1) {
+  ctx.beginPath();
+  ctx.roundRect(x,y,w,h,r);
+  ctx.fillStyle = fill; ctx.fill();
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
+}
+function text(t,x,y,size,color=C.ink,weight='400',max=1000,lh=1.18) {
+  ctx.font = weight + ' ' + size + 'px Aptos, Segoe UI, Arial';
+  ctx.fillStyle = color;
+  const words = String(t).split(' ');
+  let line = '', yy = y;
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > max && line) {
+      ctx.fillText(line, x, yy); line = w; yy += size * lh;
+    } else line = test;
+  }
+  if (line) ctx.fillText(line, x, yy);
+}
+function pill(t,x,y,w,color) {
+  rr(x,y,w,34,11,color+'22',color,1.2);
+  ctx.textAlign='center'; text(t,x+w/2,y+22,14,color,'700',w-20); ctx.textAlign='left';
+}
+function bg() {
+  ctx.fillStyle = C.bg; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = C.blue; ctx.fillRect(0,0,W,8);
+  ctx.fillStyle = C.red; ctx.fillRect(0,8,W/3,4);
+  ctx.fillStyle = C.yellow; ctx.fillRect(W/3,8,W/3,4);
+  ctx.fillStyle = C.green; ctx.fillRect(2*W/3,8,W/3,4);
+}
+function footer() { text('AidFlow  |  Google Solution Challenge 2026 demo',50,685,14,'#6E7B90','600',800); }
+function arrow(x1,y1,x2,y2,color=C.cyan) {
+  ctx.strokeStyle=color; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  const a=Math.atan2(y2-y1,x2-x1); ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2-14*Math.cos(a-.45),y2-14*Math.sin(a-.45)); ctx.lineTo(x2-14*Math.cos(a+.45),y2-14*Math.sin(a+.45)); ctx.closePath(); ctx.fill();
+}
+function topTitle(kicker,title,sub) {
+  text(kicker.toUpperCase(),54,78,14,C.cyan,'800',700);
+  text(title,52,123,40,C.ink,'800',900);
+  if (sub) text(sub,56,162,20,C.muted,'500',980);
+}
+function fade(local,d=1){ return Math.min(1, Math.max(0, local/d)); }
+function alpha(a, fn){ ctx.save(); ctx.globalAlpha=a; fn(); ctx.restore(); }
+function featureBadge(n,label,x,y,color) {
+  ctx.textAlign='center';
+  rr(x,y,78,78,22,color+'22',color,2);
+  text(n,x+39,y+49,34,color,'900',70);
+  ctx.textAlign='left'; text(label,x+100,y+32,24,C.white,'800',310); 
+}
+function drawMic(x,y,t) {
+  rr(x,y,250,230,28,'#0E1422','#283B5D',2);
+  text('Voice Report',x+28,y+44,24,C.white,'800',190);
+  pill('Hindi',x+157,y+22,70,C.green);
+  ctx.strokeStyle=C.red; ctx.lineWidth=7; ctx.lineCap='round';
+  for(let i=0;i<28;i++){ const h=24+Math.sin(t*8+i*.75)*34+((i%5)*5); const xx=x+45+i*6; ctx.beginPath(); ctx.moveTo(xx,y+145-h/2); ctx.lineTo(xx,y+145+h/2); ctx.stroke(); }
+  text('Gemini extracts location, urgency, type, and volunteers needed.',x+28,y+204,15,C.muted,'500',195);
+}
+function drawBoard(x,y) {
+  rr(x,y,370,330,28,'#0E1422','#283B5D',2);
+  text('Priority Board',x+30,y+45,25,C.white,'800',280);
+  pill('AI 92%',x+260,y+22,78,C.green);
+  const cards=[['HIGH','Medical','Ward 5 medicine delivery',C.red],['MED','Food','Shelter food packets',C.yellow],['LOW','Infrastructure','Streetlight repair',C.green]];
+  cards.forEach((c,i)=>{ rr(x+30,y+78+i*72,310,52,14,'#151D2D','#2A3853'); pill(c[0],x+48,y+90+i*72,62,c[3]); text(c[1],x+128,y+103+i*72,15,C.ink,'700',100); text(c[2],x+128,y+124+i*72,12,C.muted,'500',170); });
+}
+function drawDedup(x,y) {
+  rr(x,y,430,185,26,'#251317','#7D2A34',2);
+  text('Possible Duplicate Detected',x+30,y+46,25,'#FFBAC2','800',360);
+  text('Gemini compares the new report against open incidents and asks the coordinator what to do.',x+30,y+82,16,C.ink,'500',350);
+  pill('Create separately',x+30,y+128,135,C.yellow); pill('Link reports',x+182,y+128,112,C.green); pill('Cancel',x+313,y+128,72,C.red);
+}
+function drawAdaptive(x,y) {
+  rr(x,y,470,275,28,'#0E1422','#2A3853',2);
+  text('Adaptive learning loop',x+30,y+45,26,C.white,'800',380);
+  const pts=[['AI says MEDIUM',C.yellow],['Coordinator changes HIGH',C.red],['Correction saved',C.green],['Next prompt calibrated',C.cyan]];
+  pts.forEach((p,i)=>{ const yy=y+85+i*42; rr(x+35,yy,245,28,10,p[1]+'20',p[1]); text(p[0],x+50,yy+19,13,p[1],'800',210); if(i<3) arrow(x+315,yy+14,x+375,yy+56,p[1]); });
+  text('Recent overrides become few-shot examples for Gemini.',x+30,y+246,15,C.muted,'500',380);
+}
+function drawDispatch(x,y) {
+  rr(x,y,360,275,28,'#102016','#2E6B48',2);
+  text('Volunteer dispatch',x+30,y+45,25,C.white,'800',280);
+  [['Medical','Same zone','12 tasks'],['Food','Nearby','5 tasks'],['Safety','Far zone','2 tasks']].forEach((r,i)=>{ rr(x+30,y+80+i*50,300,34,12,'#142C21','#2D6A4A'); text((i+1)+'. '+r.join('  ·  '),x+48,y+102+i*50,14,'#BFF7D4','700',250); });
+  text('Gemini ranks free volunteers; transactions keep assignment status consistent.',x+30,y+238,14,C.muted,'500',290);
+}
+const scenes = [
+  { start:0, end:18, draw:(p,t)=>{ bg(); topTitle('AidFlow','Crisis reports to coordinated action','A 3-minute prototype demo for Google Solution Challenge 2026'); text('AI-powered NGO coordination using Firebase + Gemini Flash',60,255,30,C.white,'800',700); pill('Cloud deployed',60,330,132,C.blue); pill('Gemini AI',210,330,112,C.green); pill('Live MVP',340,330,100,C.yellow); rr(805,98,355,455,34,'#0E1422','#25314A',2); text('Report',850,150,18,C.muted,'700',220); rr(850,180,265,72,16,'#151D2D','#2A3853'); text('Ward 5 bridge blocked; elderly residents need medicine.',874,210,17,C.ink,'700',210); arrow(982,270,982,325); rr(850,345,265,92,18,'#101A2B','#325078'); text('Gemini: HIGH',874,382,22,C.red,'900',210); text('Infrastructure · 4 volunteers',874,414,15,C.muted,'600',210); arrow(982,455,982,500,C.green); rr(850,520,265,42,15,'#102016','#2E6B48'); text('Board updated live',900,548,17,'#BFF7D4','800',210); footer(); }},
+  { start:18, end:36, draw:(p,t)=>{ bg(); topTitle('The problem','Crisis coordination fails when reports are noisy','Repeated, multilingual, incomplete field updates slow down dispatch.'); [['Redundant reports','Same incident, different wording'],['Language barriers','Hindi, Kannada, Telugu, Marathi, English'],['Manual triage','Urgency decisions take coordinator time']].forEach((c,i)=>{ rr(84+i*390,260,310,170,28,'#0E1422','#26314A',2); text(c[0],112+i*390,318,27,[C.red,C.yellow,C.blue][i],'900',250); text(c[1],112+i*390,365,18,C.ink,'600',235); }); text('AidFlow focuses on the operating bottleneck: turning field noise into reliable action.',160,555,27,C.white,'800',950); footer(); }},
+  { start:36, end:72, draw:(p,t)=>{ bg(); topTitle('Feature 1','Multimodal AI intake','Field workers can submit reports as text, voice, or OCR images.'); featureBadge('1','Speak naturally. Gemini structures the report.',60,225,C.blue); drawMic(760,200,t); rr(85,405,450,72,20,'#101522','#283B5D'); text('Output JSON: location · affected group · English description · urgency · need type · confidence · volunteers needed',112,448,18,C.ink,'700',390); text('Impact: faster reporting for field workers who cannot stop to fill a perfect form.',88,555,25,C.white,'800',960); footer(); }},
+  { start:72, end:111, draw:(p,t)=>{ bg(); topTitle('Feature 2','AI deduplication + live priority board','Before saving, Gemini checks whether a new report overlaps existing open incidents.'); featureBadge('2','Prevent duplicate dispatches before they happen.',60,214,C.yellow); drawDedup(706,178); drawBoard(740,405); text('Impact: coordinators spend less time reconciling reports and more time moving people and supplies.',88,585,24,C.white,'800',1010); footer(); }},
+  { start:111, end:150, draw:(p,t)=>{ bg(); topTitle('Feature 3','Adaptive learning + volunteer dispatch','Human coordinators stay in control, and their corrections improve future classifications.'); featureBadge('3','Corrections become future prompt context.',60,218,C.green); drawAdaptive(630,175); drawDispatch(245,380); text('Impact: the AI adapts to each NGO while Gemini ranks volunteers by skill, zone, experience, and urgency.',88,635,23,C.white,'800',1040); footer(); }},
+  { start:150, end:171, draw:(p,t)=>{ bg(); topTitle('Google stack','Built for the Solution Challenge','A working Firebase deployment using Google AI.'); [['React + Vite','Frontend experience'],['Firebase Hosting','Cloud deployment'],['Cloud Firestore','Realtime needs, orgs, volunteers, corrections'],['Firebase Auth','Coordinator access'],['Gemini Flash','Classification, OCR, deduplication, ranking']].forEach((r,i)=>{ const y=210+i*70; text(r[0],145,y,28,[C.blue,C.green,C.yellow,C.red,C.cyan][i],'900',310); text(r[1],485,y,23,C.ink,'600',610); }); footer(); }},
+  { start:171, end:999, draw:(p,t)=>{ bg(); topTitle('Closing','AidFlow is not just a form','It is an adaptive AI-native crisis pipeline for faster, safer resource allocation.'); if(landing.complete){ ctx.save(); ctx.globalAlpha=.46; ctx.drawImage(landing,705,150,450,313); ctx.restore(); rr(705,150,450,313,26,'#00000000','#2A3853',2); } pill('MVP: smart-resource-allocatio-3e4d2.web.app',112,430,390,C.cyan); text('From noisy field reports to ranked needs, duplicate warnings, and volunteer dispatch.',112,530,30,C.white,'900',760); footer(); }}
+];
+function renderAt(t) {
+  const s = scenes.find(v => t >= v.start && t < v.end) || scenes[scenes.length-1];
+  const p = (t - s.start) / (s.end - s.start);
+  s.draw(p,t);
+}
+async function record() {
+  if (!landing.complete) await new Promise(r => landing.onload = r);
+  await audio.play().catch(()=>{});
+  const stream = canvas.captureStream(30);
+  const audioCtx = new AudioContext();
+  const source = audioCtx.createMediaElementSource(audio);
+  const dest = audioCtx.createMediaStreamDestination();
+  source.connect(dest); source.connect(audioCtx.destination);
+  dest.stream.getAudioTracks().forEach(track => stream.addTrack(track));
+  const chunks = [];
+  const rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus', videoBitsPerSecond: 4500000, audioBitsPerSecond: 128000 });
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.start(1000);
+  const start = performance.now();
+  function frame() {
+    const t = (performance.now() - start) / 1000;
+    renderAt(t);
+    if (!audio.ended && t < 190) requestAnimationFrame(frame);
+    else { renderAt(Math.min(t,180)); setTimeout(()=>rec.stop(), 500); }
+  }
+  frame();
+  await new Promise(resolve => rec.onstop = resolve);
+  const blob = new Blob(chunks, { type: 'video/webm' });
+  const buf = await blob.arrayBuffer();
+  return Array.from(new Uint8Array(buf));
+}
+window.__recordAidFlow = record;
+window.__recordAidFlowVisualOnly = async function() {
+  if (!landing.complete) await new Promise(r => landing.onload = r);
+  const stream = canvas.captureStream(24);
+  const chunks = [];
+  const rec = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 4200000 });
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.start(1000);
+  const start = performance.now();
+  function frame() {
+    const t = (performance.now() - start) / 1000;
+    renderAt(t);
+    if (t < 180) requestAnimationFrame(frame);
+    else { renderAt(180); setTimeout(()=>rec.stop(), 300); }
+  }
+  frame();
+  await new Promise(resolve => rec.onstop = resolve);
+  const blob = new Blob(chunks, { type: 'video/webm' });
+  const buf = await blob.arrayBuffer();
+  return Array.from(new Uint8Array(buf));
+};
+</script>
+</body>
+</html>

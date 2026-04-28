@@ -1,13 +1,15 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import { subscribeToNeeds } from '../services/firestore';
 import { OrgContext } from './OrgContext';
+import { demoNeeds, isDemoMode } from '../demo/demoMode';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const NeedsContext = createContext({ needs: [], loading: true, error: null });
 
 export function NeedsProvider({ children }) {
-  const [needs, setNeeds] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const demo = isDemoMode();
+  const [needs, setNeeds] = useState(demo ? demoNeeds : []);
+  const [loading, setLoading] = useState(!demo);
   const [error, setError] = useState(null);
 
   // Read orgId from OrgContext — null means no org selected
@@ -15,6 +17,12 @@ export function NeedsProvider({ children }) {
   const orgId = currentOrg?.id || null;
 
   useEffect(() => {
+    if (demo) {
+      setNeeds(demoNeeds);
+      setLoading(false);
+      setError(null);
+      return undefined;
+    }
     // Full isolation: no org = no data
     if (!orgId) {
       setNeeds([]);
@@ -41,7 +49,7 @@ export function NeedsProvider({ children }) {
     );
 
     return () => unsubscribe();
-  }, [orgId]);
+  }, [orgId, demo]);
 
   return (
     <NeedsContext.Provider value={{ needs, loading, error }}>

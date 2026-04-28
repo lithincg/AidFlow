@@ -1,5 +1,6 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from './firebase';
+import { isDemoMode } from '../demo/demoMode';
 
 const functions = getFunctions(app);
 
@@ -87,6 +88,17 @@ async function callGeminiDirect(body, retries = 1) {
 // ── Call 1: Classify a text-based need ────────────────
 
 export async function classifyNeed({ location, description, affectedGroup, fewShotBlock = '' }) {
+  if (isDemoMode()) {
+    await new Promise((r) => setTimeout(r, 700));
+    return normalizeClassification({
+      urgency: 'HIGH',
+      needType: 'Medical',
+      reason: 'The report involves blocked access and vulnerable people needing medicine, so it requires immediate dispatch.',
+      confidence: 'high',
+      volunteersNeeded: 3,
+    });
+  }
+
   if (USE_CLOUD_FUNCTIONS) {
     const fn = httpsCallable(functions, 'classifyNeed');
     const result = await fn({ location, description, affectedGroup });
@@ -134,6 +146,21 @@ Rules:
 // ── Call 2: OCR + classify from image ─────────────────
 
 export async function extractAndClassifyFromImage(base64ImageData, mimeType) {
+  if (isDemoMode()) {
+    await new Promise((r) => setTimeout(r, 800));
+    return normalizeClassification({
+      location: 'Government School Shelter, Hubballi',
+      description: 'Temporary shelter needs food packets, drinking water, and sanitary supplies by evening.',
+      affectedGroup: 'Families displaced by flooding',
+      urgency: 'MEDIUM',
+      needType: 'Food',
+      reason: 'The shelter needs essential supplies soon, but no immediate life-threatening condition is stated.',
+      confidence: 'medium',
+      unreadParts: null,
+      rawTextExtracted: 'Shelter: Government School, Hubballi. 120 people. Food, water, sanitary supplies needed.',
+    });
+  }
+
   if (USE_CLOUD_FUNCTIONS) {
     const fn = httpsCallable(functions, 'extractAndClassifyFromImage');
     const result = await fn({ base64ImageData, mimeType });
@@ -188,6 +215,17 @@ If this image is not a field report or does not contain community need informati
 // ── Call 3: Rank volunteers for a specific need ──────
 
 export async function rankVolunteersForNeed({ need, freeVolunteers }) {
+  if (isDemoMode()) {
+    await new Promise((r) => setTimeout(r, 700));
+    const preferred = ['vol-arjun', 'vol-fatima', 'vol-kiran'];
+    const remaining = freeVolunteers.map((v) => v.id).filter((id) => !preferred.includes(id));
+    return {
+      rankedVolunteerIds: [...preferred.filter((id) => freeVolunteers.some((v) => v.id === id)), ...remaining],
+      reasoning: 'Arjun and Fatima are the strongest matches because they have medical and elder-care skills near Ward 5. Kiran adds transport support for the blocked bridge access.',
+      confidence: 'high',
+    };
+  }
+
   if (!freeVolunteers || freeVolunteers.length === 0) {
     return { rankedVolunteerIds: [], reasoning: 'No free volunteers available.', confidence: 'low' };
   }
@@ -292,6 +330,18 @@ Return JSON:
 // ── Call 5: Check for duplicate / related needs ──────
 
 export async function checkDuplicateNeeds({ newNeed, existingNeeds }) {
+  if (isDemoMode()) {
+    await new Promise((r) => setTimeout(r, 700));
+    return {
+      isDuplicate: true,
+      relatedNeedIds: ['need-medicine-ward5', 'need-bridge-duplicate'],
+      relationship: 'duplicate',
+      mergeRecommendation: 'This appears to describe the same Ward 5 bridge blockage and medicine access issue already on the board. Link it to the open incident instead of dispatching a separate team.',
+      combinedVolunteersNeeded: 4,
+      confidence: 'high',
+    };
+  }
+
   if (!existingNeeds || existingNeeds.length === 0) {
     return { isDuplicate: false, relatedNeedIds: [], mergeRecommendation: null, confidence: 'high' };
   }
@@ -363,6 +413,23 @@ Rules:
 // ── Call 6: Classify a voice-transcribed report ──────
 
 export async function classifyVoiceReport({ transcript, fewShotBlock = '' }) {
+  if (isDemoMode()) {
+    await new Promise((r) => setTimeout(r, 800));
+    return normalizeClassification({
+      language: 'Kannada',
+      location: 'Ward 5, Dharwad',
+      description: 'The bridge approach is blocked after rain, and elderly residents need urgent medicine delivery.',
+      affectedGroup: 'Elderly residents and diabetic patients',
+      reporterName: 'Anita',
+      urgency: 'HIGH',
+      needType: 'Medical',
+      reason: 'Medicine access for vulnerable residents is time-sensitive and blocked by infrastructure damage.',
+      confidence: 'high',
+      volunteersNeeded: 3,
+      originalTranscript: transcript,
+    });
+  }
+
   if (!transcript || transcript.trim().length === 0) {
     throw new Error('Empty transcript');
   }
